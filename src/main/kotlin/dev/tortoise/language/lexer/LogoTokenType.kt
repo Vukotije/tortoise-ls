@@ -1,0 +1,28 @@
+package dev.tortoise.language.lexer
+
+enum class LogoTokenType {
+    KEYWORD_TO,
+    KEYWORD_DEFINE,
+    KEYWORD_END,
+    KEYWORD_REPEAT,
+    KEYWORD_FOR,
+    KEYWORD_IF,
+    KEYWORD_IFELSE,
+    KEYWORD_DOTIMES,
+    KEYWORD_WHILE,
+    KEYWORD_UNTIL,
+    KEYWORD_MAKE,
+    KEYWORD_LOCALMAKE,
+    KEYWORD_NAME,
+    IDENTIFIER,
+    VARIABLE_REFERENCE,
+    WORD_LITERAL,
+    NUMBER,
+    LEFT_BRACKET,
+    RIGHT_BRACKET,
+    LEFT_PAREN,
+    RIGHT_PAREN,
+    NEWLINE,
+    BAD_TOKEN,
+    EOF,
+}
