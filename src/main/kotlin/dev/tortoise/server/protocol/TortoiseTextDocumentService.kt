@@ -1,0 +1,17 @@
+package dev.tortoise.server.protocol
+
+import org.eclipse.lsp4j.DidChangeTextDocumentParams
+import org.eclipse.lsp4j.DidCloseTextDocumentParams
+import org.eclipse.lsp4j.DidOpenTextDocumentParams
+import org.eclipse.lsp4j.DidSaveTextDocumentParams
+import org.eclipse.lsp4j.services.TextDocumentService
+
+class TortoiseTextDocumentService : TextDocumentService {
+    override fun didOpen(params: DidOpenTextDocumentParams) = Unit
+
+    override fun didChange(params: DidChangeTextDocumentParams) = Unit
+
+    override fun didClose(params: DidCloseTextDocumentParams) = Unit
+
+    override fun didSave(params: DidSaveTextDocumentParams) = Unit
+}
