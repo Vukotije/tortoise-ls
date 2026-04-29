@@ -1,5 +1,8 @@
 package dev.tortoise.server.protocol
 
+import dev.tortoise.application.documents.DocumentStore
+import dev.tortoise.application.documents.FullTextSyncStrategy
+import dev.tortoise.application.documents.InMemoryDocumentStore
 import java.util.concurrent.CompletableFuture
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
@@ -9,8 +12,10 @@ import org.eclipse.lsp4j.services.LanguageServer
 import org.eclipse.lsp4j.services.TextDocumentService
 import org.eclipse.lsp4j.services.WorkspaceService
 
-class TortoiseLanguageServer : LanguageServer, LanguageClientAware {
-    private val textDocumentService = TortoiseTextDocumentService()
+class TortoiseLanguageServer(
+    private val documentStore: DocumentStore = InMemoryDocumentStore(FullTextSyncStrategy()),
+) : LanguageServer, LanguageClientAware {
+    private val textDocumentService = TortoiseTextDocumentService(documentStore)
     private val workspaceService = TortoiseWorkspaceService()
 
     private var client: LanguageClient? = null
