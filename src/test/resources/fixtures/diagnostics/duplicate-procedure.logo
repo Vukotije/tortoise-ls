@@ -1,0 +1,7 @@
+to draw
+  forward 1
+end
+
+to draw
+  forward 2
+end
