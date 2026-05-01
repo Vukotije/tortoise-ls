@@ -3,13 +3,21 @@ package dev.tortoise.server.protocol
 import dev.tortoise.application.analysis.AnalysisService
 import dev.tortoise.application.documents.DocumentStore
 import dev.tortoise.application.documents.TextDocumentChange
+import dev.tortoise.application.features.CompletionService
 import dev.tortoise.application.features.DefinitionService
+import dev.tortoise.application.features.LogoCompletionService
 import dev.tortoise.application.features.LogoDefinitionService
 import dev.tortoise.application.features.LogoReferenceService
 import dev.tortoise.application.features.ReferenceService
+import dev.tortoise.shared.model.LogoCompletionItem
+import dev.tortoise.shared.model.LogoCompletionItemKind
 import dev.tortoise.shared.model.LogoDiagnostic
 import dev.tortoise.shared.text.SourcePosition
 import java.util.concurrent.CompletableFuture
+import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.CompletionItemKind
+import org.eclipse.lsp4j.CompletionList
+import org.eclipse.lsp4j.CompletionParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
@@ -27,6 +35,7 @@ class TortoiseTextDocumentService(
     private val analysisService: AnalysisService,
     private val definitionService: DefinitionService = LogoDefinitionService(),
     private val referenceService: ReferenceService = LogoReferenceService(),
+    private val completionService: CompletionService = LogoCompletionService(),
     private val publishDiagnostics: (uri: String, version: Int?, diagnostics: List<LogoDiagnostic>) -> Unit,
 ) : TextDocumentService {
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -115,6 +124,40 @@ class TortoiseTextDocumentService(
                 }
                 .toMutableList(),
         )
+    }
+
+    override fun completion(params: CompletionParams): CompletableFuture<Either<MutableList<CompletionItem>, CompletionList>> {
+        val uri = params.textDocument.uri
+        val document = documentStore.get(uri)
+            ?: return CompletableFuture.completedFuture(Either.forLeft(mutableListOf()))
+        val analysis = analysisService.getCached(uri)
+            ?: return CompletableFuture.completedFuture(Either.forLeft(mutableListOf()))
+        val position = document.text.toSourcePosition(
+            line = params.position.line,
+            character = params.position.character,
+        )
+
+        return CompletableFuture.completedFuture(
+            Either.forLeft(
+                completionService.completions(analysis, position)
+                    .map(::toLspCompletionItem)
+                    .toMutableList(),
+            ),
+        )
+    }
+
+    private fun toLspCompletionItem(item: LogoCompletionItem): CompletionItem {
+        return CompletionItem(item.label).apply {
+            kind = when (item.kind) {
+                LogoCompletionItemKind.BUILT_IN,
+                LogoCompletionItemKind.PROCEDURE,
+                -> CompletionItemKind.Function
+                LogoCompletionItemKind.PARAMETER,
+                LogoCompletionItemKind.VARIABLE,
+                -> CompletionItemKind.Variable
+            }
+            sortText = item.sortText
+        }
     }
 
     private fun String.toSourcePosition(line: Int, character: Int): SourcePosition {

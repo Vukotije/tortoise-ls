@@ -1,13 +1,18 @@
 package dev.tortoise.language.resolve
 
 import dev.tortoise.language.ast.LogoBlock
+import dev.tortoise.language.ast.LogoBinaryExpression
 import dev.tortoise.language.ast.LogoCommandStatement
 import dev.tortoise.language.ast.LogoDotimesStatement
+import dev.tortoise.language.ast.LogoDoUntilStatement
+import dev.tortoise.language.ast.LogoDoWhileStatement
 import dev.tortoise.language.ast.LogoExpression
+import dev.tortoise.language.ast.LogoIfFalseStatement
 import dev.tortoise.language.ast.LogoForStatement
 import dev.tortoise.language.ast.LogoIdentifierExpression
 import dev.tortoise.language.ast.LogoIfElseStatement
 import dev.tortoise.language.ast.LogoIfStatement
+import dev.tortoise.language.ast.LogoIfTrueStatement
 import dev.tortoise.language.ast.LogoListExpression
 import dev.tortoise.language.ast.LogoNameStatement
 import dev.tortoise.language.ast.LogoParenthesizedExpression
@@ -15,10 +20,13 @@ import dev.tortoise.language.ast.LogoProcedureDeclaration
 import dev.tortoise.language.ast.LogoProgram
 import dev.tortoise.language.ast.LogoRepeatStatement
 import dev.tortoise.language.ast.LogoStatement
+import dev.tortoise.language.ast.LogoTestStatement
+import dev.tortoise.language.ast.LogoThingExpression
 import dev.tortoise.language.ast.LogoUntilStatement
 import dev.tortoise.language.ast.LogoVariableAssignmentStatement
 import dev.tortoise.language.ast.LogoVariableReferenceExpression
 import dev.tortoise.language.ast.LogoWhileStatement
+import dev.tortoise.language.ast.LogoWordExpression
 import dev.tortoise.language.symbols.LogoProcedureSymbol
 import dev.tortoise.language.symbols.LogoProcedureSymbolTable
 import dev.tortoise.language.symbols.LogoSymbolCollector
@@ -36,6 +44,7 @@ data class LogoScopeSnapshot(
     val id: Int,
     val kind: LogoScopeKind,
     val parentId: Int?,
+    val span: SourceSpan?,
     val declaredVariables: List<LogoVariableSymbol>,
 )
 
@@ -88,6 +97,7 @@ class TurtleLogoResolver(
         private val fileScope: MutableScope = createScope(kind = LogoScopeKind.FILE, parent = null)
 
         fun resolveProgram(program: LogoProgram) {
+            fileScope.span = program.span
             for (statement in program.statements) {
                 resolveStatement(statement, fileScope, procedureScope = null)
             }
@@ -101,6 +111,7 @@ class TurtleLogoResolver(
                         id = scope.id,
                         kind = scope.kind,
                         parentId = scope.parent?.id,
+                        span = scope.span,
                         declaredVariables = scope.declaredVariables.toList(),
                     )
                 },
@@ -126,6 +137,7 @@ class TurtleLogoResolver(
                     val header = statement.header
                     header?.components?.forEach { resolveExpression(it, currentScope) }
                     val loopScope = createScope(kind = LogoScopeKind.BLOCK, parent = currentScope)
+                    loopScope.span = statement.block?.span ?: statement.span
                     header?.variableName?.let { variableName ->
                         declareVariable(
                             name = variableName,
@@ -152,6 +164,7 @@ class TurtleLogoResolver(
                     val header = statement.header
                     resolveExpression(header?.count, currentScope)
                     val loopScope = createScope(kind = LogoScopeKind.BLOCK, parent = currentScope)
+                    loopScope.span = statement.block?.span ?: statement.span
                     header?.variableName?.let { variableName ->
                         declareVariable(
                             name = variableName,
@@ -170,6 +183,33 @@ class TurtleLogoResolver(
 
                 is LogoUntilStatement -> {
                     resolveExpression(statement.condition, currentScope)
+                    resolveBlock(statement.block, currentScope, procedureScope)
+                }
+
+                is LogoDoWhileStatement -> {
+                    resolveProcedureReference("do.while", statement.span)
+                    resolveBlock(statement.block, currentScope, procedureScope)
+                    resolveExpression(statement.condition, currentScope)
+                }
+
+                is LogoDoUntilStatement -> {
+                    resolveProcedureReference("do.until", statement.span)
+                    resolveBlock(statement.block, currentScope, procedureScope)
+                    resolveExpression(statement.condition, currentScope)
+                }
+
+                is LogoTestStatement -> {
+                    resolveProcedureReference("test", statement.span)
+                    resolveExpression(statement.condition, currentScope)
+                }
+
+                is LogoIfTrueStatement -> {
+                    resolveProcedureReference("iftrue", statement.span)
+                    resolveBlock(statement.block, currentScope, procedureScope)
+                }
+
+                is LogoIfFalseStatement -> {
+                    resolveProcedureReference("iffalse", statement.span)
                     resolveBlock(statement.block, currentScope, procedureScope)
                 }
 
@@ -204,6 +244,7 @@ class TurtleLogoResolver(
                         name = statement.command,
                         span = statement.span,
                     )
+                    resolveThingCommandRead(statement, currentScope)
                     statement.arguments.forEach { resolveExpression(it, currentScope) }
                 }
 
@@ -213,6 +254,7 @@ class TurtleLogoResolver(
 
         private fun resolveProcedureDeclaration(statement: LogoProcedureDeclaration) {
             val declarationScope = createScope(kind = LogoScopeKind.PROCEDURE, parent = fileScope)
+            declarationScope.span = statement.span
             for (parameter in statement.parameters) {
                 declareVariable(
                     name = parameter.name,
@@ -239,6 +281,7 @@ class TurtleLogoResolver(
                 return
             }
             val blockScope = createScope(kind = LogoScopeKind.BLOCK, parent = parentScope)
+            blockScope.span = block.span
             for (statement in block.statements) {
                 resolveStatement(
                     statement = statement,
@@ -261,6 +304,19 @@ class TurtleLogoResolver(
                     )
                 }
 
+                is LogoThingExpression -> {
+                    variableReferences += LogoVariableReferenceBinding(
+                        name = expression.name,
+                        span = expression.target.span,
+                        declaration = lookupVisibleVariable(expression.name, currentScope),
+                    )
+                }
+
+                is LogoBinaryExpression -> {
+                    resolveExpression(expression.left, currentScope)
+                    resolveExpression(expression.right, currentScope)
+                }
+
                 is LogoListExpression -> expression.elements.forEach { resolveExpression(it, currentScope) }
                 is LogoParenthesizedExpression -> expression.expressions.forEach { resolveExpression(it, currentScope) }
                 is LogoIdentifierExpression,
@@ -271,9 +327,21 @@ class TurtleLogoResolver(
             }
         }
 
+        private fun resolveThingCommandRead(statement: LogoCommandStatement, currentScope: MutableScope) {
+            if (!statement.command.equals("thing", ignoreCase = true)) {
+                return
+            }
+            val target = statement.arguments.firstOrNull() as? LogoWordExpression ?: return
+            variableReferences += LogoVariableReferenceBinding(
+                name = target.value,
+                span = target.span,
+                declaration = lookupVisibleVariable(target.value, currentScope),
+            )
+        }
+
         private fun resolveProcedureReference(name: String, span: SourceSpan) {
             val declaration = procedureTable.resolve(name)
-            val isBuiltIn = BuiltInProcedures.contains(name)
+            val isBuiltIn = declaration == null && BuiltInProcedures.contains(name)
             procedureReferences += LogoProcedureReferenceBinding(
                 name = name,
                 span = span,
@@ -359,6 +427,7 @@ class TurtleLogoResolver(
             val id: Int,
             val kind: LogoScopeKind,
             val parent: MutableScope?,
+            var span: SourceSpan? = null,
             val latestByName: MutableMap<String, LogoVariableSymbol> = mutableMapOf(),
             val declaredVariables: MutableList<LogoVariableSymbol> = mutableListOf(),
         )

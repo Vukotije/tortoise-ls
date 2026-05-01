@@ -25,6 +25,7 @@ class CachedAnalysisService(
         return DocumentAnalysis(
             uri = document.uri,
             version = document.version,
+            text = document.text,
             parseResult = parseResult,
             resolutionResult = resolutionResult,
             diagnostics = diagnostics,

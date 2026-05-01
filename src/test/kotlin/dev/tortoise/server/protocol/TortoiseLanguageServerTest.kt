@@ -3,6 +3,7 @@ package dev.tortoise.server.protocol
 import dev.tortoise.application.analysis.CachedAnalysisService
 import dev.tortoise.application.documents.FullTextSyncStrategy
 import dev.tortoise.application.documents.InMemoryDocumentStore
+import org.eclipse.lsp4j.CompletionParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
@@ -35,7 +36,8 @@ class TortoiseLanguageServerTest {
 
         assertNotNull(result.capabilities)
         assertEquals(TextDocumentSyncKind.Full, result.capabilities.textDocumentSync.left)
-        assertNull(result.capabilities.completionProvider)
+        assertNotNull(result.capabilities.completionProvider)
+        assertEquals(false, result.capabilities.completionProvider.resolveProvider)
         assertEquals(true, result.capabilities.definitionProvider.left)
         assertEquals(true, result.capabilities.referencesProvider.left)
         assertNull(result.capabilities.semanticTokensProvider)
@@ -162,6 +164,38 @@ class TortoiseLanguageServerTest {
         assertEquals(uri, location.uri)
         assertEquals(Position(0, 3), location.range.start)
         assertEquals(Position(0, 9), location.range.end)
+    }
+
+    @Test
+    fun `completion request returns deterministic items from cached analysis`() {
+        val store = InMemoryDocumentStore(FullTextSyncStrategy())
+        val server = TortoiseLanguageServer(store)
+        val service = server.textDocumentService
+        val uri = "file:///completion.logo"
+
+        service.didOpen(
+            DidOpenTextDocumentParams(
+                TextDocumentItem(
+                    uri,
+                    "logo",
+                    1,
+                    """
+                    to square :size
+                      forward :s
+                    end
+                    """.trimIndent(),
+                ),
+            ),
+        )
+
+        val result = service.completion(
+            CompletionParams(
+                TextDocumentIdentifier(uri),
+                Position(1, 12),
+            ),
+        ).get()
+
+        assertEquals(listOf(":size"), result.left.map { it.label })
     }
 
     private fun recordingClient(published: MutableList<PublishDiagnosticsParams>): LanguageClient {
