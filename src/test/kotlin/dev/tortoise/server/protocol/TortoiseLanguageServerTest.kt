@@ -3,11 +3,13 @@ package dev.tortoise.server.protocol
 import dev.tortoise.application.analysis.CachedAnalysisService
 import dev.tortoise.application.documents.FullTextSyncStrategy
 import dev.tortoise.application.documents.InMemoryDocumentStore
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.InitializeParams
+import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.TextDocumentSyncKind
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent
@@ -34,7 +36,7 @@ class TortoiseLanguageServerTest {
         assertNotNull(result.capabilities)
         assertEquals(TextDocumentSyncKind.Full, result.capabilities.textDocumentSync.left)
         assertNull(result.capabilities.completionProvider)
-        assertNull(result.capabilities.definitionProvider)
+        assertEquals(true, result.capabilities.definitionProvider.left)
         assertNull(result.capabilities.referencesProvider)
         assertNull(result.capabilities.semanticTokensProvider)
     }
@@ -123,6 +125,43 @@ class TortoiseLanguageServerTest {
         assertEquals(2, secondPublish.version)
         assertTrue(secondPublish.diagnostics.any { diagnosticMessage(it).contains("Unknown variable ':ghost'") })
         assertFalse(secondPublish.diagnostics.any { diagnosticMessage(it).contains("Unknown procedure 'missingProc'") })
+    }
+
+    @Test
+    fun `definition request returns procedure declaration location`() {
+        val store = InMemoryDocumentStore(FullTextSyncStrategy())
+        val server = TortoiseLanguageServer(store)
+        val service = server.textDocumentService
+        val uri = "file:///definition.logo"
+
+        service.didOpen(
+            DidOpenTextDocumentParams(
+                TextDocumentItem(
+                    uri,
+                    "logo",
+                    1,
+                    """
+                    to square :size
+                      forward :size
+                    end
+
+                    square 10
+                    """.trimIndent(),
+                ),
+            ),
+        )
+
+        val result = service.definition(
+            DefinitionParams(
+                TextDocumentIdentifier(uri),
+                Position(4, 2),
+            ),
+        ).get()
+
+        val location = result.left.single()
+        assertEquals(uri, location.uri)
+        assertEquals(Position(0, 3), location.range.start)
+        assertEquals(Position(0, 9), location.range.end)
     }
 
     private fun recordingClient(published: MutableList<PublishDiagnosticsParams>): LanguageClient {

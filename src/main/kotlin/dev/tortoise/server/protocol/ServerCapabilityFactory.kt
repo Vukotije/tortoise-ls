@@ -8,5 +8,6 @@ object ServerCapabilityFactory {
     fun minimalCapabilities(): ServerCapabilities =
         ServerCapabilities().apply {
             textDocumentSync = Either.forLeft(TextDocumentSyncKind.Full)
+            definitionProvider = Either.forLeft(true)
         }
 }
