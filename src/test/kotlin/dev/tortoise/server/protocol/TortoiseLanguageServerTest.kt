@@ -12,6 +12,7 @@ import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
+import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.TextDocumentSyncKind
 import org.eclipse.lsp4j.TextDocumentContentChangeEvent
 import org.eclipse.lsp4j.TextDocumentIdentifier
@@ -40,7 +41,13 @@ class TortoiseLanguageServerTest {
         assertEquals(false, result.capabilities.completionProvider.resolveProvider)
         assertEquals(true, result.capabilities.definitionProvider.left)
         assertEquals(true, result.capabilities.referencesProvider.left)
-        assertNull(result.capabilities.semanticTokensProvider)
+        assertNotNull(result.capabilities.semanticTokensProvider)
+        assertEquals(
+            listOf("keyword", "procedure", "builtin", "parameter", "variable", "number"),
+            result.capabilities.semanticTokensProvider.legend.tokenTypes,
+        )
+        assertTrue(result.capabilities.semanticTokensProvider.full.left)
+        assertFalse(result.capabilities.semanticTokensProvider.range.left)
     }
 
     @Test
@@ -196,6 +203,49 @@ class TortoiseLanguageServerTest {
         ).get()
 
         assertEquals(listOf(":size"), result.left.map { it.label })
+    }
+
+    @Test
+    fun `semantic tokens request returns lsp encoded tokens from cached analysis`() {
+        val store = InMemoryDocumentStore(FullTextSyncStrategy())
+        val server = TortoiseLanguageServer(store)
+        val service = server.textDocumentService
+        val uri = "file:///tokens.logo"
+
+        service.didOpen(
+            DidOpenTextDocumentParams(
+                TextDocumentItem(
+                    uri,
+                    "logo",
+                    1,
+                    """
+                    to square :size
+                      forward :size
+                    end
+
+                    square 10
+                    """.trimIndent(),
+                ),
+            ),
+        )
+
+        val result = service.semanticTokensFull(
+            SemanticTokensParams(TextDocumentIdentifier(uri)),
+        ).get()
+
+        assertEquals(
+            listOf(
+                0, 0, 2, 0, 0,
+                0, 3, 6, 1, 0,
+                0, 7, 5, 3, 0,
+                1, 2, 7, 2, 0,
+                0, 8, 5, 3, 0,
+                1, 0, 3, 0, 0,
+                2, 0, 6, 1, 0,
+                0, 7, 2, 5, 0,
+            ),
+            result.data,
+        )
     }
 
     private fun recordingClient(published: MutableList<PublishDiagnosticsParams>): LanguageClient {

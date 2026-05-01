@@ -8,7 +8,9 @@ import dev.tortoise.application.features.DefinitionService
 import dev.tortoise.application.features.LogoCompletionService
 import dev.tortoise.application.features.LogoDefinitionService
 import dev.tortoise.application.features.LogoReferenceService
+import dev.tortoise.application.features.LogoSemanticTokensService
 import dev.tortoise.application.features.ReferenceService
+import dev.tortoise.application.features.SemanticTokensService
 import dev.tortoise.shared.model.LogoCompletionItem
 import dev.tortoise.shared.model.LogoCompletionItemKind
 import dev.tortoise.shared.model.LogoDiagnostic
@@ -28,6 +30,8 @@ import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.SemanticTokens
+import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.services.TextDocumentService
 
 class TortoiseTextDocumentService(
@@ -36,6 +40,7 @@ class TortoiseTextDocumentService(
     private val definitionService: DefinitionService = LogoDefinitionService(),
     private val referenceService: ReferenceService = LogoReferenceService(),
     private val completionService: CompletionService = LogoCompletionService(),
+    private val semanticTokensService: SemanticTokensService = LogoSemanticTokensService(),
     private val publishDiagnostics: (uri: String, version: Int?, diagnostics: List<LogoDiagnostic>) -> Unit,
 ) : TextDocumentService {
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -142,6 +147,20 @@ class TortoiseTextDocumentService(
                 completionService.completions(analysis, position)
                     .map(::toLspCompletionItem)
                     .toMutableList(),
+            ),
+        )
+    }
+
+    override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
+        val uri = params.textDocument.uri
+        documentStore.get(uri)
+            ?: return CompletableFuture.completedFuture(SemanticTokens(emptyList()))
+        val analysis = analysisService.getCached(uri)
+            ?: return CompletableFuture.completedFuture(SemanticTokens(emptyList()))
+
+        return CompletableFuture.completedFuture(
+            SemanticTokensProtocolMapper.toLspSemanticTokens(
+                semanticTokensService.semanticTokens(analysis),
             ),
         )
     }
