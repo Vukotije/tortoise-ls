@@ -1,0 +1,6 @@
+to square :size
+  forward :si<caret>ze
+  repeat 4 [
+    right :size
+  ]
+end

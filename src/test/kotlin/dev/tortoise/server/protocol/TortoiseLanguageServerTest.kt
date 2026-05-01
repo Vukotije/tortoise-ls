@@ -37,7 +37,7 @@ class TortoiseLanguageServerTest {
         assertEquals(TextDocumentSyncKind.Full, result.capabilities.textDocumentSync.left)
         assertNull(result.capabilities.completionProvider)
         assertEquals(true, result.capabilities.definitionProvider.left)
-        assertNull(result.capabilities.referencesProvider)
+        assertEquals(true, result.capabilities.referencesProvider.left)
         assertNull(result.capabilities.semanticTokensProvider)
     }
 

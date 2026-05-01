@@ -1,0 +1,7 @@
+to demo
+  localmake "distance 10
+  forward :dist<caret>ance
+  repeat 2 [
+    forward :distance
+  ]
+end

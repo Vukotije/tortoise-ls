@@ -1,28 +1,32 @@
 package dev.tortoise.server.protocol
 
 import dev.tortoise.application.analysis.AnalysisService
-import dev.tortoise.application.features.DefinitionService
-import dev.tortoise.application.features.LogoDefinitionService
 import dev.tortoise.application.documents.DocumentStore
 import dev.tortoise.application.documents.TextDocumentChange
+import dev.tortoise.application.features.DefinitionService
+import dev.tortoise.application.features.LogoDefinitionService
+import dev.tortoise.application.features.LogoReferenceService
+import dev.tortoise.application.features.ReferenceService
 import dev.tortoise.shared.model.LogoDiagnostic
 import dev.tortoise.shared.text.SourcePosition
+import java.util.concurrent.CompletableFuture
+import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
 import org.eclipse.lsp4j.DidCloseTextDocumentParams
 import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
-import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.Range
+import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.TextDocumentService
-import java.util.concurrent.CompletableFuture
 
 class TortoiseTextDocumentService(
     private val documentStore: DocumentStore,
     private val analysisService: AnalysisService,
     private val definitionService: DefinitionService = LogoDefinitionService(),
+    private val referenceService: ReferenceService = LogoReferenceService(),
     private val publishDiagnostics: (uri: String, version: Int?, diagnostics: List<LogoDiagnostic>) -> Unit,
 ) : TextDocumentService {
     override fun didOpen(params: DidOpenTextDocumentParams) {
@@ -83,6 +87,33 @@ class TortoiseTextDocumentService(
                     ),
                 ),
             ),
+        )
+    }
+
+    override fun references(params: ReferenceParams): CompletableFuture<MutableList<out Location>> {
+        val uri = params.textDocument.uri
+        val document = documentStore.get(uri)
+            ?: return CompletableFuture.completedFuture(mutableListOf())
+        val analysis = analysisService.getCached(uri)
+            ?: return CompletableFuture.completedFuture(mutableListOf())
+        val position = document.text.toSourcePosition(
+            line = params.position.line,
+            character = params.position.character,
+        )
+        val includeDeclaration = params.context?.isIncludeDeclaration ?: false
+
+        return CompletableFuture.completedFuture(
+            referenceService.references(analysis, position, includeDeclaration)
+                .map { span ->
+                    Location(
+                        uri,
+                        Range(
+                            span.start.toLspPosition(),
+                            span.end.toLspPosition(),
+                        ),
+                    )
+                }
+                .toMutableList(),
         )
     }
 

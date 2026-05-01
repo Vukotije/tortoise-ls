@@ -1,0 +1,8 @@
+to square :size
+  forward :size
+end
+
+to demo
+  squ<caret>are 10
+  square 20
+end

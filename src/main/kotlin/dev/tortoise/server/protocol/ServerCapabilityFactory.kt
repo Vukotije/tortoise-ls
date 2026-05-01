@@ -9,5 +9,6 @@ object ServerCapabilityFactory {
         ServerCapabilities().apply {
             textDocumentSync = Either.forLeft(TextDocumentSyncKind.Full)
             definitionProvider = Either.forLeft(true)
+            referencesProvider = Either.forLeft(true)
         }
 }
