@@ -86,6 +86,7 @@ class TurtleLogoParser(
             }
             return LogoParseResult(
                 program = LogoProgram(statements, programSpan),
+                tokens = tokens,
                 errors = errors.toList(),
             )
         }

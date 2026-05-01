@@ -1,0 +1,9 @@
+to square :size
+  localmake "step 10
+  repeat 4 [
+    forward :size
+    square :step
+  ]
+end
+
+square 100

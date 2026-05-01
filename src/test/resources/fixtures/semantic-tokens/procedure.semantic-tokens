@@ -1,0 +1,16 @@
+legend|keyword,procedure,builtin,parameter,variable,number
+1:1-1:3|keyword|to
+1:4-1:10|procedure|square
+1:11-1:16|parameter|:size
+2:3-2:12|keyword|localmake
+2:13-2:18|variable|"step
+2:19-2:21|number|10
+3:3-3:9|keyword|repeat
+3:10-3:11|number|4
+4:5-4:12|builtin|forward
+4:13-4:18|parameter|:size
+5:5-5:11|procedure|square
+5:12-5:17|variable|:step
+7:1-7:4|keyword|end
+9:1-9:7|procedure|square
+9:8-9:11|number|100
