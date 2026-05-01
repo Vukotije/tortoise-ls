@@ -76,6 +76,33 @@ data class LogoUntilStatement(
     override val span: SourceSpan,
 ) : LogoStatement
 
+data class LogoDoWhileStatement(
+    val block: LogoBlock?,
+    val condition: LogoExpression?,
+    override val span: SourceSpan,
+) : LogoStatement
+
+data class LogoDoUntilStatement(
+    val block: LogoBlock?,
+    val condition: LogoExpression?,
+    override val span: SourceSpan,
+) : LogoStatement
+
+data class LogoTestStatement(
+    val condition: LogoExpression?,
+    override val span: SourceSpan,
+) : LogoStatement
+
+data class LogoIfTrueStatement(
+    val block: LogoBlock?,
+    override val span: SourceSpan,
+) : LogoStatement
+
+data class LogoIfFalseStatement(
+    val block: LogoBlock?,
+    override val span: SourceSpan,
+) : LogoStatement
+
 data class LogoVariableAssignmentStatement(
     val kind: AssignmentKind,
     val target: LogoWordExpression?,
@@ -134,8 +161,21 @@ data class LogoVariableReferenceExpression(
     override val span: SourceSpan,
 ) : LogoExpression
 
+data class LogoThingExpression(
+    val name: String,
+    val target: LogoWordExpression,
+    override val span: SourceSpan,
+) : LogoExpression
+
 data class LogoIdentifierExpression(
     val name: String,
+    override val span: SourceSpan,
+) : LogoExpression
+
+data class LogoBinaryExpression(
+    val left: LogoExpression,
+    val operator: String,
+    val right: LogoExpression,
     override val span: SourceSpan,
 ) : LogoExpression
 

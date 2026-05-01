@@ -2,16 +2,21 @@ package dev.tortoise.language.parser
 
 import dev.tortoise.language.ast.LogoBadExpression
 import dev.tortoise.language.ast.LogoBadStatement
+import dev.tortoise.language.ast.LogoBinaryExpression
 import dev.tortoise.language.ast.LogoBlock
 import dev.tortoise.language.ast.LogoCommandStatement
 import dev.tortoise.language.ast.LogoDotimesHeader
 import dev.tortoise.language.ast.LogoDotimesStatement
+import dev.tortoise.language.ast.LogoDoUntilStatement
+import dev.tortoise.language.ast.LogoDoWhileStatement
 import dev.tortoise.language.ast.LogoExpression
 import dev.tortoise.language.ast.LogoForHeader
 import dev.tortoise.language.ast.LogoForStatement
+import dev.tortoise.language.ast.LogoIfFalseStatement
 import dev.tortoise.language.ast.LogoIdentifierExpression
 import dev.tortoise.language.ast.LogoIfElseStatement
 import dev.tortoise.language.ast.LogoIfStatement
+import dev.tortoise.language.ast.LogoIfTrueStatement
 import dev.tortoise.language.ast.LogoListExpression
 import dev.tortoise.language.ast.LogoNameStatement
 import dev.tortoise.language.ast.LogoNumberExpression
@@ -21,6 +26,8 @@ import dev.tortoise.language.ast.LogoProcedureDeclaration
 import dev.tortoise.language.ast.LogoProgram
 import dev.tortoise.language.ast.LogoRepeatStatement
 import dev.tortoise.language.ast.LogoStatement
+import dev.tortoise.language.ast.LogoTestStatement
+import dev.tortoise.language.ast.LogoThingExpression
 import dev.tortoise.language.ast.LogoUntilStatement
 import dev.tortoise.language.ast.LogoVariableAssignmentStatement
 import dev.tortoise.language.ast.LogoVariableReferenceExpression
@@ -97,9 +104,8 @@ class TurtleLogoParser(
             }
 
             return when (peek().type) {
-                LogoTokenType.KEYWORD_TO,
-                LogoTokenType.KEYWORD_DEFINE,
-                -> parseProcedureDeclaration()
+                LogoTokenType.KEYWORD_TO -> parseProcedureDeclaration()
+                LogoTokenType.KEYWORD_DEFINE -> parseDefineStatement()
 
                 LogoTokenType.KEYWORD_REPEAT -> parseRepeatStatement()
                 LogoTokenType.KEYWORD_FOR -> parseForStatement()
@@ -113,7 +119,7 @@ class TurtleLogoParser(
                 -> parseVariableAssignmentStatement(stopTokens)
 
                 LogoTokenType.KEYWORD_NAME -> parseNameStatement(stopTokens)
-                LogoTokenType.IDENTIFIER -> parseCommandStatement(stopTokens)
+                LogoTokenType.IDENTIFIER -> parseIdentifierStatement(stopTokens)
                 LogoTokenType.NEWLINE -> {
                     advance()
                     null
@@ -195,6 +201,91 @@ class TurtleLogoParser(
                 body = body,
                 span = SourceSpan(keywordToken.span.start, endPosition),
             )
+        }
+
+        private fun parseDefineStatement(): LogoProcedureDeclaration {
+            return if (peekNext()?.type == LogoTokenType.WORD_LITERAL) {
+                parseDefineListProcedure()
+            } else {
+                parseProcedureDeclaration()
+            }
+        }
+
+        private fun parseDefineListProcedure(): LogoProcedureDeclaration {
+            val keywordToken = advance()
+            val nameToken = if (match(LogoTokenType.WORD_LITERAL)) {
+                previous()
+            } else {
+                reportError("Expected quoted procedure name after 'define'.", peek().span)
+                null
+            }
+            val name = nameToken?.lexeme?.removePrefix("\"")
+
+            val outerOpening = if (match(LogoTokenType.LEFT_BRACKET)) {
+                previous()
+            } else {
+                reportError("Expected define body list '[[inputs][body]]'.", peek().span)
+                null
+            }
+
+            val parameters = parseDefineParameterList()
+            val body = if (outerOpening != null) {
+                parseBlockOrError("Expected define procedure body block '[ ... ]'.")
+            } else {
+                null
+            }
+
+            val outerClosing = if (outerOpening != null && match(LogoTokenType.RIGHT_BRACKET)) {
+                previous()
+            } else {
+                reportError("Expected closing ']' for define body list.", peek().span)
+                null
+            }
+
+            val bodyBlock = body ?: LogoBlock(emptyList(), SourceSpan(nameToken?.span?.end ?: keywordToken.span.end, nameToken?.span?.end ?: keywordToken.span.end))
+            val endPosition = outerClosing?.span?.end ?: bodyBlock.span.end
+            return LogoProcedureDeclaration(
+                keyword = keywordToken.lexeme.lowercase(),
+                name = name,
+                parameters = parameters,
+                body = bodyBlock,
+                span = SourceSpan(keywordToken.span.start, endPosition),
+            )
+        }
+
+        private fun parseDefineParameterList(): List<LogoParameter> {
+            if (!match(LogoTokenType.LEFT_BRACKET)) {
+                reportError("Expected define input list '[inputs]'.", peek().span)
+                return emptyList()
+            }
+
+            val parameters = mutableListOf<LogoParameter>()
+            while (!isAtEnd() && !check(LogoTokenType.RIGHT_BRACKET)) {
+                if (match(LogoTokenType.NEWLINE)) {
+                    continue
+                }
+                val token = when {
+                    match(LogoTokenType.IDENTIFIER) -> previous()
+                    match(LogoTokenType.VARIABLE_REFERENCE) -> previous()
+                    match(LogoTokenType.WORD_LITERAL) -> previous()
+                    else -> {
+                        val badToken = advance()
+                        reportError("Expected input name in define input list.", badToken.span)
+                        null
+                    }
+                }
+                if (token != null) {
+                    parameters += LogoParameter(
+                        name = token.lexeme.removePrefix(":").removePrefix("\""),
+                        span = token.span,
+                    )
+                }
+            }
+
+            if (!match(LogoTokenType.RIGHT_BRACKET)) {
+                reportError("Expected closing ']' for define input list.", peek().span)
+            }
+            return parameters
         }
 
         private fun parseRepeatStatement(): LogoRepeatStatement {
@@ -434,6 +525,66 @@ class TurtleLogoParser(
             )
         }
 
+        private fun parseIdentifierStatement(stopTokens: Set<LogoTokenType>): LogoStatement {
+            return when (peek().lexeme.lowercase()) {
+                "do.while" -> parseDoWhileStatement()
+                "do.until" -> parseDoUntilStatement()
+                "test" -> parseTestStatement()
+                "iftrue" -> parseIfTrueStatement()
+                "iffalse" -> parseIfFalseStatement()
+                else -> parseCommandStatement(stopTokens)
+            }
+        }
+
+        private fun parseDoWhileStatement(): LogoDoWhileStatement {
+            val keyword = advance()
+            val block = parseBlockOrError("Expected do.while body block '[ ... ]'.")
+            val condition = parseExpressionOrError("Expected do.while condition expression.")
+            return LogoDoWhileStatement(
+                block = block,
+                condition = condition,
+                span = spanFrom(keyword.span, condition?.span ?: block?.span),
+            )
+        }
+
+        private fun parseDoUntilStatement(): LogoDoUntilStatement {
+            val keyword = advance()
+            val block = parseBlockOrError("Expected do.until body block '[ ... ]'.")
+            val condition = parseExpressionOrError("Expected do.until condition expression.")
+            return LogoDoUntilStatement(
+                block = block,
+                condition = condition,
+                span = spanFrom(keyword.span, condition?.span ?: block?.span),
+            )
+        }
+
+        private fun parseTestStatement(): LogoTestStatement {
+            val keyword = advance()
+            val condition = parseExpressionOrError("Expected test condition expression.")
+            return LogoTestStatement(
+                condition = condition,
+                span = spanFrom(keyword.span, condition?.span),
+            )
+        }
+
+        private fun parseIfTrueStatement(): LogoIfTrueStatement {
+            val keyword = advance()
+            val block = parseBlockOrError("Expected iftrue body block '[ ... ]'.")
+            return LogoIfTrueStatement(
+                block = block,
+                span = spanFrom(keyword.span, block?.span),
+            )
+        }
+
+        private fun parseIfFalseStatement(): LogoIfFalseStatement {
+            val keyword = advance()
+            val block = parseBlockOrError("Expected iffalse body block '[ ... ]'.")
+            return LogoIfFalseStatement(
+                block = block,
+                span = spanFrom(keyword.span, block?.span),
+            )
+        }
+
         private fun parseCommandStatement(stopTokens: Set<LogoTokenType>): LogoCommandStatement {
             val commandToken = advance()
             val arguments = mutableListOf<LogoExpression>()
@@ -525,6 +676,25 @@ class TurtleLogoParser(
         }
 
         private fun parseExpression(): LogoExpression? {
+            var expression = parsePrimaryExpression() ?: return null
+            while (peek().type.isBinaryOperator()) {
+                val operator = advance()
+                val right = parsePrimaryExpression()
+                if (right == null) {
+                    reportError("Expected expression after operator '${operator.lexeme}'.", operator.span)
+                    break
+                }
+                expression = LogoBinaryExpression(
+                    left = expression,
+                    operator = operator.lexeme,
+                    right = right,
+                    span = spanFrom(expression.span, right.span),
+                )
+            }
+            return expression
+        }
+
+        private fun parsePrimaryExpression(): LogoExpression? {
             return when (peek().type) {
                 LogoTokenType.NUMBER -> {
                     val token = advance()
@@ -543,6 +713,14 @@ class TurtleLogoParser(
 
                 LogoTokenType.IDENTIFIER -> {
                     val token = advance()
+                    if (token.lexeme.equals("thing", ignoreCase = true) && match(LogoTokenType.WORD_LITERAL)) {
+                        val target = LogoWordExpression(previous().lexeme.removePrefix("\""), previous().span)
+                        return LogoThingExpression(
+                            name = target.value,
+                            target = target,
+                            span = spanFrom(token.span, target.span),
+                        )
+                    }
                     LogoIdentifierExpression(token.lexeme, token.span)
                 }
 
@@ -562,6 +740,11 @@ class TurtleLogoParser(
                 LogoTokenType.NEWLINE,
                 LogoTokenType.RIGHT_BRACKET,
                 LogoTokenType.RIGHT_PAREN,
+                LogoTokenType.EQUAL,
+                LogoTokenType.LESS_THAN,
+                LogoTokenType.GREATER_THAN,
+                LogoTokenType.PLUS,
+                LogoTokenType.STAR,
                 LogoTokenType.EOF,
                 -> null
 
@@ -661,6 +844,14 @@ class TurtleLogoParser(
             return true
         }
 
+        private fun LogoTokenType.isBinaryOperator(): Boolean {
+            return this == LogoTokenType.EQUAL ||
+                this == LogoTokenType.LESS_THAN ||
+                this == LogoTokenType.GREATER_THAN ||
+                this == LogoTokenType.PLUS ||
+                this == LogoTokenType.STAR
+        }
+
         private fun advance(): LogoToken {
             if (!isAtEnd()) {
                 current += 1
@@ -671,6 +862,8 @@ class TurtleLogoParser(
         private fun isAtEnd(): Boolean = peek().type == LogoTokenType.EOF
 
         private fun peek(): LogoToken = tokens[current]
+
+        private fun peekNext(): LogoToken? = tokens.getOrNull(current + 1)
 
         private fun previous(): LogoToken = tokens[current - 1]
 

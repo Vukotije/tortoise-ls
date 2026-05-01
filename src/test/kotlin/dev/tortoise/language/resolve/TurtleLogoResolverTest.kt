@@ -141,6 +141,44 @@ class TurtleLogoResolverTest {
         assertTrue(result.procedureReferences.any { it.name.equals("forward", ignoreCase = true) && it.isBuiltIn })
     }
 
+    @Test
+    fun `resolve user procedure when its name collides with a built-in`() {
+        val source = """
+            to forward
+              right 90
+            end
+
+            forward
+        """.trimIndent()
+
+        val result = resolve(source)
+        val forwardCall = result.procedureReferences.single { it.name == "forward" }
+
+        assertFalse(forwardCall.isBuiltIn)
+        assertNotNull(forwardCall.declaration)
+        assertEquals("forward", forwardCall.declaration?.normalizedName)
+    }
+
+    @Test
+    fun `resolve thing reads and new control blocks through semantic core`() {
+        val source = """
+            make "a 1
+            do.while [
+              show thing "a
+            ] :a < 8
+            test :a = 1 iftrue [print :a] iffalse [print :missing]
+        """.trimIndent()
+
+        val result = resolve(source)
+
+        assertTrue(result.procedureReferences.any { it.name == "do.while" && it.isBuiltIn })
+        assertTrue(result.procedureReferences.any { it.name == "test" && it.isBuiltIn })
+        assertTrue(result.procedureReferences.any { it.name == "iftrue" && it.isBuiltIn })
+        assertTrue(result.procedureReferences.any { it.name == "iffalse" && it.isBuiltIn })
+        assertTrue(result.variableReferences.any { it.name == "a" && it.span.start.line == 3 })
+        assertTrue(result.unresolvedVariableReferences.any { it.name == "missing" })
+    }
+
     private fun resolve(source: String): LogoResolutionResult {
         val parseResult = parser.parse(source)
         assertTrue(parseResult.errors.isEmpty(), "Unexpected parser errors: ${parseResult.errors}")

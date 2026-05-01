@@ -43,13 +43,25 @@ class TurtleLogoLexer {
                     ']' -> addSingleCharacterToken(LogoTokenType.RIGHT_BRACKET)
                     '(' -> addSingleCharacterToken(LogoTokenType.LEFT_PAREN)
                     ')' -> addSingleCharacterToken(LogoTokenType.RIGHT_PAREN)
+                    ';' -> skipComment()
+                    '=' -> addSingleCharacterToken(LogoTokenType.EQUAL)
+                    '<' -> addSingleCharacterToken(LogoTokenType.LESS_THAN)
+                    '>' -> addSingleCharacterToken(LogoTokenType.GREATER_THAN)
+                    '*' -> addSingleCharacterToken(LogoTokenType.STAR)
                     '"' -> tokenizeWordLiteral()
                     ':' -> tokenizeVariableReference()
-                    '-', '+' -> {
+                    '-' -> {
                         if (peekNext()?.isDigit() == true) {
                             tokenizeNumber()
                         } else {
                             tokenizeBadToken()
+                        }
+                    }
+                    '+' -> {
+                        if (peekNext()?.isDigit() == true) {
+                            tokenizeNumber()
+                        } else {
+                            addSingleCharacterToken(LogoTokenType.PLUS)
                         }
                     }
                     else -> {
@@ -165,6 +177,12 @@ class TurtleLogoLexer {
             )
         }
 
+        private fun skipComment() {
+            while (!isAtEnd() && peek() != '\n' && peek() != '\r') {
+                advance()
+            }
+        }
+
         private fun tokenizeBadToken() {
             val startPosition = currentPosition()
             val startOffset = index
@@ -202,7 +220,8 @@ class TurtleLogoLexer {
 
         private fun isIdentifierStart(char: Char): Boolean = char.isLetter() || char == '_'
 
-        private fun isIdentifierPart(char: Char): Boolean = char.isLetterOrDigit() || char == '_' || char == '?'
+        private fun isIdentifierPart(char: Char): Boolean =
+            char.isLetterOrDigit() || char == '_' || char == '?' || char == '.'
 
         private fun isWordLiteralPart(char: Char): Boolean =
             !char.isWhitespace() &&

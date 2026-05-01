@@ -71,6 +71,51 @@ class LogoDefinitionServiceTest {
         assertNull(definitionService.definition(analysis, marker.position))
     }
 
+    @Test
+    fun `find definition for user procedure that collides with built-in name`() {
+        val source = """
+            to forward
+              right 90
+            end
+
+            for<caret>ward
+        """.trimIndent()
+
+        val result = definitionAt(source)
+
+        assertEquals("forward", result.targetLexeme)
+        assertEquals("1:4-1:11", result.targetRange)
+    }
+
+    @Test
+    fun `find definition for thing word literal variable read`() {
+        val source = """
+            to demo
+              localmake "distance 10
+              show thing "dist<caret>ance
+            end
+        """.trimIndent()
+
+        val result = definitionAt(source)
+
+        assertEquals("\"distance", result.targetLexeme)
+        assertEquals("2:13-2:22", result.targetRange)
+    }
+
+    @Test
+    fun `find definition for procedure declared with Turtle Academy define list form`() {
+        val source = """
+            define "star [[n][repeat 5 [fd :n rt 144]]]
+
+            st<caret>ar 50
+        """.trimIndent()
+
+        val result = definitionAt(source)
+
+        assertEquals("\"star", result.targetLexeme)
+        assertEquals("1:8-1:13", result.targetRange)
+    }
+
     private fun definitionAt(sourceWithCaret: String): DefinitionResult {
         val marker = sourceWithCaret.withCaret()
         val analysis = analysisService.analyze(DocumentSnapshot("file:///definition.logo", 1, marker.source))

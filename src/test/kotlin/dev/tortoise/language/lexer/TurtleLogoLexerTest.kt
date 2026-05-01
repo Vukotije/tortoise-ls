@@ -1,6 +1,8 @@
 package dev.tortoise.language.lexer
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class TurtleLogoLexerTest {
@@ -90,5 +92,26 @@ class TurtleLogoLexerTest {
 
         val badToken = tokens.first { it.type == LogoTokenType.BAD_TOKEN }
         assertEquals("@", badToken.lexeme)
+    }
+
+    @Test
+    fun `tokenize recognizes dotted identifiers operators and comments`() {
+        val source = """
+            do.while [ make "x :x + 1 ] :x < 8 ; keep looping
+            if 2>1 [print "ok]
+            if (random 2) = 0 [show "zero]
+            dotimes [i 5] [show :i * :i]
+        """.trimIndent()
+
+        val tokens = lexer.tokenize(source)
+        val tokenTypes = tokens.map { it.type }
+
+        assertEquals("do.while", tokens.first().lexeme)
+        assertTrue(LogoTokenType.PLUS in tokenTypes)
+        assertTrue(LogoTokenType.LESS_THAN in tokenTypes)
+        assertTrue(LogoTokenType.GREATER_THAN in tokenTypes)
+        assertTrue(LogoTokenType.EQUAL in tokenTypes)
+        assertTrue(LogoTokenType.STAR in tokenTypes)
+        assertFalse(tokens.any { it.lexeme == ";" })
     }
 }

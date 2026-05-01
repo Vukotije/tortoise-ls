@@ -44,9 +44,17 @@ class LogoSemanticTokensService : SemanticTokensService {
                         ?: variableReferencesByStart[token.span.start.offset]?.declaration?.kind
                     ).toVariableTokenType()
 
-                LogoTokenType.WORD_LITERAL -> variableDeclarationsByStart[token.span.start.offset]
-                    ?.kind
-                    .toVariableTokenType()
+                LogoTokenType.WORD_LITERAL -> if (isProcedureDeclarationName(token, analysis.parseResult.tokens)) {
+                    LogoSemanticTokenType.PROCEDURE
+                } else {
+                    variableDeclarationsByStart[token.span.start.offset]
+                        ?.kind
+                        .toVariableTokenType()
+                        ?: variableReferencesByStart[token.span.start.offset]
+                            ?.declaration
+                            ?.kind
+                            .toVariableTokenType()
+                }
 
                 LogoTokenType.IDENTIFIER -> classifyIdentifier(
                     token = token,
@@ -94,8 +102,12 @@ class LogoSemanticTokensService : SemanticTokensService {
         }
 
         val previousToken = tokens[tokenIndex - 1]
-        return previousToken.type == LogoTokenType.KEYWORD_TO ||
-            previousToken.type == LogoTokenType.KEYWORD_DEFINE
+        return when (token.type) {
+            LogoTokenType.IDENTIFIER -> previousToken.type == LogoTokenType.KEYWORD_TO ||
+                previousToken.type == LogoTokenType.KEYWORD_DEFINE
+            LogoTokenType.WORD_LITERAL -> previousToken.type == LogoTokenType.KEYWORD_DEFINE
+            else -> false
+        }
     }
 
     private fun LogoVariableSymbolKind?.toVariableTokenType(): LogoSemanticTokenType? {

@@ -1,9 +1,14 @@
 package dev.tortoise.language.parser
 
 import dev.tortoise.language.ast.LogoForStatement
+import dev.tortoise.language.ast.LogoBinaryExpression
+import dev.tortoise.language.ast.LogoDoWhileStatement
+import dev.tortoise.language.ast.LogoIfFalseStatement
 import dev.tortoise.language.ast.LogoIfElseStatement
 import dev.tortoise.language.ast.LogoProcedureDeclaration
 import dev.tortoise.language.ast.LogoRepeatStatement
+import dev.tortoise.language.ast.LogoTestStatement
+import dev.tortoise.language.ast.LogoThingExpression
 import dev.tortoise.language.ast.LogoVariableAssignmentStatement
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -97,5 +102,58 @@ class TurtleLogoParserTest {
         assertFalse(result.errors.isEmpty())
         assertEquals(2, result.program.statements.size)
         assertInstanceOf(LogoVariableAssignmentStatement::class.java, result.program.statements[1])
+    }
+
+    @Test
+    fun `parse documented test branches and infix comparisons conservatively`() {
+        val source = """
+            test 3>4 iftrue [print "true] iffalse [print "false]
+        """.trimIndent()
+
+        val result = parser.parse(source)
+
+        assertTrue(result.errors.isEmpty(), "Unexpected parser errors: ${result.errors}")
+        assertEquals(3, result.program.statements.size)
+        val test = assertInstanceOf(LogoTestStatement::class.java, result.program.statements[0])
+        assertInstanceOf(LogoBinaryExpression::class.java, test.condition)
+        assertInstanceOf(dev.tortoise.language.ast.LogoIfTrueStatement::class.java, result.program.statements[1])
+        assertInstanceOf(LogoIfFalseStatement::class.java, result.program.statements[2])
+    }
+
+    @Test
+    fun `parse dotted post-test loop and thing expression`() {
+        val source = """
+            do.while [
+              make "a random 10
+              show thing "a
+            ] :a < 8
+        """.trimIndent()
+
+        val result = parser.parse(source)
+
+        assertTrue(result.errors.isEmpty(), "Unexpected parser errors: ${result.errors}")
+        val loop = assertInstanceOf(LogoDoWhileStatement::class.java, result.program.statements.single())
+        assertEquals(2, loop.block?.statements?.size)
+        assertInstanceOf(LogoBinaryExpression::class.java, loop.condition)
+        val show = assertInstanceOf(
+            dev.tortoise.language.ast.LogoCommandStatement::class.java,
+            loop.block?.statements?.get(1),
+        )
+        assertInstanceOf(LogoThingExpression::class.java, show.arguments.single())
+    }
+
+    @Test
+    fun `parse Turtle Academy define list procedure form`() {
+        val source = """
+            define "star [[n][repeat 5 [fd :n rt 144]]]
+        """.trimIndent()
+
+        val result = parser.parse(source)
+
+        assertTrue(result.errors.isEmpty(), "Unexpected parser errors: ${result.errors}")
+        val procedure = assertInstanceOf(LogoProcedureDeclaration::class.java, result.program.statements.single())
+        assertEquals("star", procedure.name)
+        assertEquals(listOf("n"), procedure.parameters.map { it.name })
+        assertEquals(1, procedure.body.statements.size)
     }
 }

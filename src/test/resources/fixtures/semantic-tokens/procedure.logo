@@ -7,3 +7,4 @@ to square :size
 end
 
 square 100
+

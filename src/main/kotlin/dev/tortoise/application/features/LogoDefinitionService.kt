@@ -12,7 +12,9 @@ class LogoDefinitionService : DefinitionService {
         val token = analysis.parseResult.tokens.firstOrNull { it.span.contains(position) } ?: return null
         return when (token.type) {
             LogoTokenType.IDENTIFIER -> procedureDefinition(analysis, token)
-            LogoTokenType.VARIABLE_REFERENCE -> variableDefinition(analysis, token)
+            LogoTokenType.VARIABLE_REFERENCE,
+            LogoTokenType.WORD_LITERAL,
+            -> variableDefinition(analysis, token)
             else -> null
         }
     }
@@ -40,8 +42,7 @@ class LogoDefinitionService : DefinitionService {
     private fun procedureNameSpan(analysis: DocumentAnalysis, declaration: LogoProcedureSymbol): SourceSpan? {
         val tokens = analysis.parseResult.tokens
         return tokens.withIndex().firstOrNull { (index, token) ->
-            token.type == LogoTokenType.IDENTIFIER &&
-                token.lexeme.equals(declaration.name, ignoreCase = true) &&
+            token.isProcedureNameToken(declaration) &&
                 token.span.isInside(declaration.declarationSpan) &&
                 index > 0 &&
                 tokens[index - 1].type.isProcedureDeclarationKeyword()
@@ -58,5 +59,13 @@ class LogoDefinitionService : DefinitionService {
 
     private fun LogoTokenType.isProcedureDeclarationKeyword(): Boolean {
         return this == LogoTokenType.KEYWORD_TO || this == LogoTokenType.KEYWORD_DEFINE
+    }
+
+    private fun LogoToken.isProcedureNameToken(declaration: LogoProcedureSymbol): Boolean {
+        return when (type) {
+            LogoTokenType.IDENTIFIER -> lexeme.equals(declaration.name, ignoreCase = true)
+            LogoTokenType.WORD_LITERAL -> lexeme.removePrefix("\"").equals(declaration.name, ignoreCase = true)
+            else -> false
+        }
     }
 }
