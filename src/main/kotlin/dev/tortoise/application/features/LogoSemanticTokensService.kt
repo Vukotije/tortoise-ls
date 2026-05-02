@@ -3,6 +3,7 @@ package dev.tortoise.application.features
 import dev.tortoise.application.analysis.DocumentAnalysis
 import dev.tortoise.language.lexer.LogoToken
 import dev.tortoise.language.lexer.LogoTokenType
+import dev.tortoise.language.resolve.LogoProcedureReferenceBinding
 import dev.tortoise.language.symbols.LogoVariableSymbolKind
 import dev.tortoise.shared.model.LogoSemanticToken
 import dev.tortoise.shared.model.LogoSemanticTokenLegend
@@ -76,7 +77,7 @@ class LogoSemanticTokensService : SemanticTokensService {
 
     private fun classifyIdentifier(
         token: LogoToken,
-        procedureReferencesByStart: Map<Int, dev.tortoise.language.resolve.LogoProcedureReferenceBinding>,
+        procedureReferencesByStart: Map<Int, LogoProcedureReferenceBinding>,
         analysis: DocumentAnalysis,
     ): LogoSemanticTokenType? {
         val procedureReference = procedureReferencesByStart[token.span.start.offset]

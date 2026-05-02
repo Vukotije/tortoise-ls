@@ -14,7 +14,7 @@ class LogoReferenceService : ReferenceService {
         position: SourcePosition,
         includeDeclaration: Boolean,
     ): List<SourceSpan> {
-        val token = analysis.parseResult.tokens.firstOrNull { it.span.contains(position) } ?: return emptyList()
+        val token = analysis.tokenAt(position) ?: return emptyList()
         return when (token.type) {
             LogoTokenType.IDENTIFIER -> procedureReferences(analysis, token, includeDeclaration)
             LogoTokenType.VARIABLE_REFERENCE,
@@ -33,12 +33,12 @@ class LogoReferenceService : ReferenceService {
         val declaration = procedureSymbolAt(analysis, token) ?: return emptyList()
         val spans = mutableListOf<SourceSpan>()
         if (includeDeclaration) {
-            spans += procedureNameSpan(analysis, declaration) ?: declaration.declarationSpan
+            spans += analysis.procedureNameSpan(declaration) ?: declaration.declarationSpan
         }
 
         spans += analysis.resolutionResult.procedureReferences
             .filter { reference -> !reference.isBuiltIn && reference.declaration == declaration }
-            .mapNotNull { reference -> tokenAtStartOffset(analysis, reference.span.start.offset)?.span }
+            .mapNotNull { reference -> analysis.tokenAtStartOffset(reference.span.start.offset)?.span }
 
         return spans.sortedDistinct()
     }
@@ -69,7 +69,7 @@ class LogoReferenceService : ReferenceService {
         }
 
         val declaration = analysis.resolutionResult.procedureTable.resolve(token.lexeme) ?: return null
-        return if (procedureNameSpan(analysis, declaration) == token.span) {
+        return if (analysis.procedureNameSpan(declaration) == token.span) {
             declaration
         } else {
             null
@@ -88,42 +88,8 @@ class LogoReferenceService : ReferenceService {
         }
     }
 
-    private fun procedureNameSpan(analysis: DocumentAnalysis, declaration: LogoProcedureSymbol): SourceSpan? {
-        val tokens = analysis.parseResult.tokens
-        return tokens.withIndex().firstOrNull { (index, token) ->
-            token.isProcedureNameToken(declaration) &&
-                token.span.isInside(declaration.declarationSpan) &&
-                index > 0 &&
-                tokens[index - 1].type.isProcedureDeclarationKeyword()
-        }?.value?.span
-    }
-
-    private fun tokenAtStartOffset(analysis: DocumentAnalysis, offset: Int): LogoToken? {
-        return analysis.parseResult.tokens.firstOrNull { token -> token.span.start.offset == offset }
-    }
-
     private fun List<SourceSpan>.sortedDistinct(): List<SourceSpan> {
         return distinctBy { span -> span.start.offset to span.end.offset }
             .sortedWith(compareBy({ it.start.offset }, { it.end.offset }))
-    }
-
-    private fun SourceSpan.contains(position: SourcePosition): Boolean {
-        return position.offset >= start.offset && position.offset < end.offset
-    }
-
-    private fun SourceSpan.isInside(container: SourceSpan): Boolean {
-        return start.offset >= container.start.offset && end.offset <= container.end.offset
-    }
-
-    private fun LogoTokenType.isProcedureDeclarationKeyword(): Boolean {
-        return this == LogoTokenType.KEYWORD_TO || this == LogoTokenType.KEYWORD_DEFINE
-    }
-
-    private fun LogoToken.isProcedureNameToken(declaration: LogoProcedureSymbol): Boolean {
-        return when (type) {
-            LogoTokenType.IDENTIFIER -> lexeme.equals(declaration.name, ignoreCase = true)
-            LogoTokenType.WORD_LITERAL -> lexeme.removePrefix("\"").equals(declaration.name, ignoreCase = true)
-            else -> false
-        }
     }
 }
