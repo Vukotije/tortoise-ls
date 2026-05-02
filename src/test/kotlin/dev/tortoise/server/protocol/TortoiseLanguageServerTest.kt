@@ -202,7 +202,13 @@ class TortoiseLanguageServerTest {
             ),
         ).get()
 
-        assertEquals(listOf(":size"), result.left.map { it.label })
+        val item = result.left.single()
+        val textEdit = item.textEdit.left
+        assertEquals(":size", item.label)
+        assertNull(item.insertText)
+        assertEquals(":size", textEdit.newText)
+        assertEquals(Position(1, 10), textEdit.range.start)
+        assertEquals(Position(1, 12), textEdit.range.end)
     }
 
     @Test

@@ -57,6 +57,23 @@ class LogoCompletionServiceTest {
     }
 
     @Test
+    fun `completion replacement span covers colon-prefixed variable fragment`() {
+        val source = """
+            to square :size
+              forward :si<caret>
+            end
+        """.trimIndent()
+        val marker = source.withCaret()
+        val analysis = analysisService.analyze(DocumentSnapshot("file:///completion.logo", 1, marker.source))
+
+        val item = completionService.completions(analysis, marker.position).single()
+
+        assertEquals(":size", item.label)
+        assertEquals(":si", marker.source.substring(item.replaceSpan.start.offset, item.replaceSpan.end.offset))
+        assertEquals(marker.position, item.replaceSpan.end)
+    }
+
+    @Test
     fun `complete user procedures with identifier prefix at file position`() {
         val source = """
             to square :size
@@ -113,6 +130,19 @@ class LogoCompletionServiceTest {
         val result = completionsAt(source)
 
         assertEquals(listOf("do.until", "do.while"), result.map { it.label })
+    }
+
+    @Test
+    fun `completion replacement span covers dotted built-in fragment`() {
+        val source = "do.u<caret>"
+        val marker = source.withCaret()
+        val analysis = analysisService.analyze(DocumentSnapshot("file:///completion.logo", 1, marker.source))
+
+        val item = completionService.completions(analysis, marker.position).single()
+
+        assertEquals("do.until", item.label)
+        assertEquals("do.u", marker.source.substring(item.replaceSpan.start.offset, item.replaceSpan.end.offset))
+        assertEquals(marker.position, item.replaceSpan.end)
     }
 
     @Test

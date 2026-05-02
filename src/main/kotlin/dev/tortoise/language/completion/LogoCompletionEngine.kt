@@ -33,29 +33,42 @@ class LogoCompletionEngine {
         val items = mutableListOf<LogoCompletionItem>()
         items += BuiltInProcedures.names
             .filter { name -> name.lowercase() !in userProcedureNames }
-            .map { name -> completionItem(name, LogoCompletionItemKind.BUILT_IN, category = 1) }
+            .map { name ->
+                completionItem(name, LogoCompletionItemKind.BUILT_IN, category = 1, replaceSpan = prefix.replaceSpan)
+            }
         items += resolutionResult.procedureTable.allDeclarations()
-            .map { symbol -> completionItem(symbol.name, LogoCompletionItemKind.PROCEDURE, category = 2) }
+            .map { symbol ->
+                completionItem(symbol.name, LogoCompletionItemKind.PROCEDURE, category = 2, replaceSpan = prefix.replaceSpan)
+            }
         items += visibleVariables
             .filter { symbol -> symbol.kind == LogoVariableSymbolKind.PARAMETER }
-            .map { symbol -> completionItem(":${symbol.name}", LogoCompletionItemKind.PARAMETER, category = 3) }
+            .map { symbol ->
+                completionItem(":${symbol.name}", LogoCompletionItemKind.PARAMETER, category = 3, replaceSpan = prefix.replaceSpan)
+            }
         items += visibleVariables
             .filter { symbol -> symbol.kind != LogoVariableSymbolKind.PARAMETER }
-            .map { symbol -> completionItem(":${symbol.name}", LogoCompletionItemKind.VARIABLE, category = 4) }
+            .map { symbol ->
+                completionItem(":${symbol.name}", LogoCompletionItemKind.VARIABLE, category = 4, replaceSpan = prefix.replaceSpan)
+            }
 
         return items
-            .filter { item -> item.label.startsWith(prefix, ignoreCase = true) }
+            .filter { item -> item.label.startsWith(prefix.text, ignoreCase = true) }
             .distinctBy { item -> item.label.lowercase() }
             .sortedWith(compareBy({ it.sortText }, { it.label.lowercase() }))
     }
 
-    private fun completionPrefix(text: String, position: SourcePosition): String {
+    private fun completionPrefix(text: String, position: SourcePosition): CompletionPrefix {
         val end = position.offset.coerceIn(0, text.length)
         var start = end
         while (start > 0 && !text[start - 1].isCompletionBoundary()) {
             start -= 1
         }
-        return text.substring(start, end)
+        val startPosition = text.positionAt(start)
+        val endPosition = text.positionAt(end)
+        return CompletionPrefix(
+            text = text.substring(start, end),
+            replaceSpan = SourceSpan(startPosition, endPosition),
+        )
     }
 
     private fun Char.isCompletionBoundary(): Boolean {
@@ -84,14 +97,49 @@ class LogoCompletionEngine {
         ).distinctBy { symbol -> symbol.normalizedName }
     }
 
-    private fun completionItem(label: String, kind: LogoCompletionItemKind, category: Int): LogoCompletionItem {
+    private fun completionItem(
+        label: String,
+        kind: LogoCompletionItemKind,
+        category: Int,
+        replaceSpan: SourceSpan,
+    ): LogoCompletionItem {
         val normalizedLabel = label.lowercase()
         return LogoCompletionItem(
             label = label,
             kind = kind,
             sortText = "$category:$normalizedLabel",
+            replaceSpan = replaceSpan,
         )
     }
+
+    private fun String.positionAt(offset: Int): SourcePosition {
+        val targetOffset = offset.coerceIn(0, length)
+        var line = 1
+        var column = 1
+        var index = 0
+        while (index < targetOffset) {
+            val char = this[index]
+            index += 1
+            if (char == '\r') {
+                if (index < targetOffset && this[index] == '\n') {
+                    index += 1
+                }
+                line += 1
+                column = 1
+            } else if (char == '\n') {
+                line += 1
+                column = 1
+            } else {
+                column += 1
+            }
+        }
+        return SourcePosition(offset = targetOffset, line = line, column = column)
+    }
+
+    private data class CompletionPrefix(
+        val text: String,
+        val replaceSpan: SourceSpan,
+    )
 
     private fun LogoScopeSnapshot.depth(scopes: List<LogoScopeSnapshot>): Int {
         val scopesById = scopes.associateBy { scope -> scope.id }

@@ -30,6 +30,7 @@ import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.SemanticTokens
 import org.eclipse.lsp4j.SemanticTokensParams
+import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.services.TextDocumentService
 
 class TortoiseTextDocumentService(
@@ -168,6 +169,8 @@ class TortoiseTextDocumentService(
                 -> CompletionItemKind.Variable
             }
             sortText = item.sortText
+            insertText = null
+            textEdit = Either.forLeft(TextEdit(item.replaceSpan.toLspRange(), item.label))
         }
     }
 
