@@ -7,16 +7,13 @@ import dev.tortoise.application.documents.FullTextSyncStrategy
 import dev.tortoise.application.documents.InMemoryDocumentStore
 import dev.tortoise.shared.model.LogoDiagnostic
 import dev.tortoise.shared.model.LogoDiagnosticSeverity
-import dev.tortoise.shared.text.SourcePosition
 import java.util.concurrent.CompletableFuture
 import org.eclipse.lsp4j.Diagnostic
 import org.eclipse.lsp4j.DiagnosticSeverity
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
 import org.eclipse.lsp4j.MarkupContent
-import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.PublishDiagnosticsParams
-import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.LanguageClientAware
@@ -75,22 +72,12 @@ class TortoiseLanguageServer(
 
     private fun toLspDiagnostic(diagnostic: LogoDiagnostic): Diagnostic {
         return Diagnostic().apply {
-            range = Range(
-                toLspPosition(diagnostic.span.start),
-                toLspPosition(diagnostic.span.end),
-            )
+            range = diagnostic.span.toLspRange()
             message = Either.forLeft<String, MarkupContent>(diagnostic.message)
             severity = toLspSeverity(diagnostic.severity)
             source = "tortoise-ls"
             code = Either.forLeft<String, Int>(diagnostic.code)
         }
-    }
-
-    private fun toLspPosition(position: SourcePosition): Position {
-        return Position(
-            (position.line - 1).coerceAtLeast(0),
-            (position.column - 1).coerceAtLeast(0),
-        )
     }
 
     private fun toLspSeverity(severity: LogoDiagnosticSeverity): DiagnosticSeverity {

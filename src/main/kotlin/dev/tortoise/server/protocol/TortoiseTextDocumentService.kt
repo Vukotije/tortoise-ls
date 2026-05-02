@@ -14,7 +14,6 @@ import dev.tortoise.application.features.SemanticTokensService
 import dev.tortoise.shared.model.LogoCompletionItem
 import dev.tortoise.shared.model.LogoCompletionItemKind
 import dev.tortoise.shared.model.LogoDiagnostic
-import dev.tortoise.shared.text.SourcePosition
 import java.util.concurrent.CompletableFuture
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionItemKind
@@ -27,7 +26,6 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams
 import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
-import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.ReferenceParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 import org.eclipse.lsp4j.SemanticTokens
@@ -94,10 +92,7 @@ class TortoiseTextDocumentService(
                 mutableListOf(
                     Location(
                         uri,
-                        Range(
-                            targetSpan.start.toLspPosition(),
-                            targetSpan.end.toLspPosition(),
-                        ),
+                        targetSpan.toLspRange(),
                     ),
                 ),
             ),
@@ -121,10 +116,7 @@ class TortoiseTextDocumentService(
                 .map { span ->
                     Location(
                         uri,
-                        Range(
-                            span.start.toLspPosition(),
-                            span.end.toLspPosition(),
-                        ),
+                        span.toLspRange(),
                     )
                 }
                 .toMutableList(),
@@ -179,37 +171,4 @@ class TortoiseTextDocumentService(
         }
     }
 
-    private fun String.toSourcePosition(line: Int, character: Int): SourcePosition {
-        val targetLine = (line + 1).coerceAtLeast(1)
-        val targetColumn = (character + 1).coerceAtLeast(1)
-        var currentLine = 1
-        var currentColumn = 1
-        var offset = 0
-
-        while (offset < length && (currentLine < targetLine || currentColumn < targetColumn)) {
-            val char = this[offset]
-            offset += 1
-            if (char == '\r') {
-                if (offset < length && this[offset] == '\n') {
-                    offset += 1
-                }
-                currentLine += 1
-                currentColumn = 1
-            } else if (char == '\n') {
-                currentLine += 1
-                currentColumn = 1
-            } else {
-                currentColumn += 1
-            }
-        }
-
-        return SourcePosition(offset = offset, line = targetLine, column = targetColumn)
-    }
-
-    private fun SourcePosition.toLspPosition(): org.eclipse.lsp4j.Position {
-        return org.eclipse.lsp4j.Position(
-            (line - 1).coerceAtLeast(0),
-            (column - 1).coerceAtLeast(0),
-        )
-    }
 }
