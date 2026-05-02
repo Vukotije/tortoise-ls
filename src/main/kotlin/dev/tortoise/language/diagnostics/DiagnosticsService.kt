@@ -1,4 +1,4 @@
-package dev.tortoise.application.features
+package dev.tortoise.language.diagnostics
 
 import dev.tortoise.language.parser.LogoParseResult
 import dev.tortoise.language.resolve.LogoResolutionResult

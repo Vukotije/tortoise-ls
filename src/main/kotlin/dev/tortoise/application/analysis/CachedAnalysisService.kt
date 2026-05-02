@@ -1,7 +1,7 @@
 package dev.tortoise.application.analysis
 
 import dev.tortoise.application.documents.DocumentSnapshot
-import dev.tortoise.application.features.DiagnosticsService
+import dev.tortoise.language.diagnostics.DiagnosticsService
 import dev.tortoise.language.diagnostics.LogoDiagnosticsService
 import dev.tortoise.language.parser.TurtleLogoParser
 import dev.tortoise.language.resolve.TurtleLogoResolver

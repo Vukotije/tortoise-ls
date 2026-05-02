@@ -1,6 +1,5 @@
 package dev.tortoise.language.diagnostics
 
-import dev.tortoise.application.features.DiagnosticsService
 import dev.tortoise.language.parser.LogoParseError
 import dev.tortoise.language.parser.LogoParseResult
 import dev.tortoise.language.resolve.LogoResolutionResult
