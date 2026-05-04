@@ -181,22 +181,27 @@ With the language server connected:
 - Find references on `square` returns semantic procedure references in the same file. Depending on the client's "include declaration" setting, the declaration line can appear in the references result as well as being the go-to-declaration target.
 - Completion suggests built-ins, user procedures, and visible variables based on cursor position.
 
+### Feature Examples
 
+Semantic tokens highlight LOGO keywords, built-ins, user procedures, parameters, and variables in the editor.
 
+![Semantic tokens in the editor](docs/resources/highlighted-code.png)
 
-## Supported language subset
+Go-to-declaration jumps from supported calls and variable references to their same-file declarations.
 
-The server currently targets a practical subset of the Turtle Academy LOGO dialect.
+![Navigation and related IDE views](docs/resources/all-places-view.png)
 
-Supported at a high level:
+Find references returns semantic references for the selected procedure or variable binding.
 
-- Procedure declarations and references
-- Variable declarations and references
-- Basic structural analysis needed for navigation and diagnostics
-- Semantic token classification for supported language constructs
+![Find references](docs/resources/lsp-references.png)
 
-Detailed grammar and semantic assumptions:
-TODO
+Diagnostics appear in the editor and problems view after document open or change.
+
+![Duplicate procedure diagnostic](docs/resources/duplicate-procedure-warning.png)
+
+Completion suggests built-ins, user procedures, parameters, and visible variables based on cursor position.
+
+![Completion suggestions](docs/resources/completions-flow.gif)
 
 ## Supported Language Subset
 
@@ -281,6 +286,39 @@ Feature work is driven by a cached `DocumentAnalysis` per document version (`Cac
 ## Architecture
 
 The implementation is layered so that LSP protocol code stays separate from LOGO language semantics. The language core does not import LSP4J; protocol handlers convert between LSP4J types and internal, protocol-neutral models.
+
+```mermaid
+flowchart TD
+    editorClient["LSP Client"]
+    bootstrap["server.bootstrap"]
+    protocol["server.protocol"]
+    documents["application.documents"]
+    analysis["application.analysis"]
+    lexer["language.lexer"]
+    parser["language.parser"]
+    ast["language.ast"]
+    symbols["language.symbols"]
+    resolver["language.resolve"]
+    diagnostics["language.diagnostics"]
+    features["application.features"]
+    shared["shared.model / shared.text"]
+
+    editorClient --> bootstrap
+    bootstrap --> protocol
+    protocol --> documents
+    protocol --> analysis
+    documents --> analysis
+    analysis --> lexer
+    lexer --> parser
+    parser --> ast
+    ast --> symbols
+    symbols --> resolver
+    resolver --> diagnostics
+    analysis --> features
+    features --> shared
+    shared --> protocol
+    protocol --> editorClient
+```
 
 ### Runtime Flow
 
