@@ -1,4 +1,10 @@
-# Tortoise Language Server
+# Tortoise
+
+---
+
+![](docs/resources/big-cover.png)
+
+---
 
 Tortoise Language Server is a Kotlin implementation of the Language Server Protocol for the Turtle Academy LOGO dialect. It provides editor features for `.logo` files through LSP4J over stdio, with IntelliJ IDEA plus the LSP4IJ plugin as the primary client.
 
